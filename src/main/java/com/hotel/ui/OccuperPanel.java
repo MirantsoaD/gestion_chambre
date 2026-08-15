@@ -3,6 +3,8 @@ package com.hotel.ui;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,6 +26,8 @@ import com.hotel.model.Reserver;
  * Panneau des occupations : arrivée d'un client ayant réservé (incrémente le solde).
  */
 public class OccuperPanel extends JPanel {
+
+    private static final DateTimeFormatter FMT_DATE = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
     private final MainFrame parent;
     private final OccuperDAO occuperDAO = new OccuperDAO();
@@ -102,7 +106,7 @@ public class OccuperPanel extends JPanel {
                             "#" + r.getIdReserv(),
                             r.getNumChambre(),
                             r.getNomClient(),
-                            r.getDateEntree(),
+                            formaterDate(r.getDateEntree()),
                             r.getNbrJour()
                     });
                 } else {
@@ -176,5 +180,9 @@ public class OccuperPanel extends JPanel {
             message = "Erreur base de données : " + e.getMessage();
         }
         JOptionPane.showMessageDialog(this, message, "Erreur", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private static String formaterDate(LocalDate d) {
+        return d == null ? "" : FMT_DATE.format(d);
     }
 }

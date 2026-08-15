@@ -1,6 +1,7 @@
 package com.hotel.model;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Représente une réservation de chambre.
@@ -102,8 +103,10 @@ public class Reserver {
     /** Affichage dans les JComboBox du panneau Occupation. */
     @Override
     public String toString() {
+        String dateAffichage = dateEntree == null ? "?"
+                : DateTimeFormatter.ofPattern("dd-MM-yyyy").format(dateEntree);
         return "Réservation #" + idReserv + " - Chambre " + numChambre
                 + " - " + (nomClient == null ? "?" : nomClient)
-                + " (du " + dateEntree + ", " + nbrJour + " j)";
+                + " (du " + dateAffichage + ", " + nbrJour + " j)";
     }
 }

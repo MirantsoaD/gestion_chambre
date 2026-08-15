@@ -4,8 +4,9 @@ import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.sql.SQLException;
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -16,6 +17,9 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.table.DefaultTableModel;
+
+import com.github.lgooddatepicker.components.DatePicker;
+import com.github.lgooddatepicker.components.DatePickerSettings;
 
 import com.hotel.dao.ChambreDAO;
 import com.hotel.dao.ReserverDAO;
@@ -28,12 +32,14 @@ import com.hotel.util.MailSender;
  */
 public class ReserverPanel extends JPanel {
 
+    private static final DateTimeFormatter FMT_DATE = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+
     private final MainFrame parent;
     private final ReserverDAO reserverDAO = new ReserverDAO();
     private final ChambreDAO chambreDAO = new ChambreDAO();
 
     private final JComboBox<Chambre> comboChambres = new JComboBox<>();
-    private final JTextField dateField = new JTextField(10);
+    private final DatePicker datePicker = creerDatePicker();
     private final JTextField joursField = new JTextField(5);
     private final JTextField clientField = new JTextField(12);
     private final JTextField mailField = new JTextField(15);
@@ -52,14 +58,12 @@ public class ReserverPanel extends JPanel {
         this.parent = parent;
         setLayout(new BorderLayout());
 
-        dateField.setToolTipText("Format : yyyy-MM-dd");
-
         // NORTH : formulaire
         JPanel form = new JPanel(new FlowLayout(FlowLayout.LEFT));
         form.add(new JLabel("Chambre :"));
         form.add(comboChambres);
         form.add(new JLabel("Date entrée :"));
-        form.add(dateField);
+        form.add(datePicker);
         form.add(new JLabel("Jours :"));
         form.add(joursField);
         form.add(new JLabel("Client :"));
@@ -125,8 +129,8 @@ public class ReserverPanel extends JPanel {
                 tableModel.addRow(new Object[]{
                         r.getIdReserv(),
                         r.getNumChambre(),
-                        r.getDateReserv(),
-                        r.getDateEntree(),
+                        formaterDate(r.getDateReserv()),
+                        formaterDate(r.getDateEntree()),
                         r.getNbrJour(),
                         r.getNomClient(),
                         r.getMail(),
@@ -144,11 +148,20 @@ public class ReserverPanel extends JPanel {
         if (row < 0) {
             return;
         }
-        selectionnerChambreCombo(valeur(row, 1));
-        dateField.setText(valeur(row, 3));
-        joursField.setText(valeur(row, 4));
-        clientField.setText(valeur(row, 5));
-        mailField.setText(valeur(row, 6));
+        int id = Integer.parseInt(valeur(row, 0));
+        try {
+            Reserver r = reserverDAO.trouverParId(id);
+            if (r == null) {
+                return;
+            }
+            selectionnerChambreCombo(r.getNumChambre());
+            datePicker.setDate(r.getDateEntree());
+            joursField.setText(String.valueOf(r.getNbrJour()));
+            clientField.setText(r.getNomClient() == null ? "" : r.getNomClient());
+            mailField.setText(r.getMail() == null ? "" : r.getMail());
+        } catch (SQLException e) {
+            afficherErreurBD(e);
+        }
     }
 
     private void selectionnerChambreCombo(String numChambre) {
@@ -167,7 +180,7 @@ public class ReserverPanel extends JPanel {
     }
 
     private void viderFormulaire() {
-        dateField.setText("");
+        datePicker.setDate(null);
         joursField.setText("");
         clientField.setText("");
         mailField.setText("");
@@ -175,11 +188,7 @@ public class ReserverPanel extends JPanel {
     }
 
     private LocalDate lireDate() {
-        try {
-            return LocalDate.parse(dateField.getText().trim());
-        } catch (DateTimeParseException e) {
-            return null;
-        }
+        return datePicker.getDate();
     }
 
     private int lireJours() {
@@ -198,8 +207,7 @@ public class ReserverPanel extends JPanel {
             return false;
         }
         if (lireDate() == null) {
-            JOptionPane.showMessageDialog(this,
-                    "Date d'entrée invalide. Format attendu : yyyy-MM-dd.",
+            JOptionPane.showMessageDialog(this, "Choisissez une date d'entrée.",
                     "Erreur", JOptionPane.ERROR_MESSAGE);
             return false;
         }
@@ -270,8 +278,14 @@ public class ReserverPanel extends JPanel {
         String mail = mailField.getText().trim();
         try {
             int id = Integer.parseInt(valeur(row, 0));
-            LocalDate dateReserv = LocalDate.parse(valeur(row, 2));
-            boolean annulee = "Oui".equals(valeur(row, 7));
+            Reserver existante = reserverDAO.trouverParId(id);
+            if (existante == null) {
+                JOptionPane.showMessageDialog(this, "Réservation introuvable.",
+                        "Erreur", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            LocalDate dateReserv = existante.getDateReserv();
+            boolean annulee = existante.isAnnulee();
 
             if (!reserverDAO.estChambreDisponibleExcluant(c.getNumChambre(), dateEntree, jours, id)) {
                 JOptionPane.showMessageDialog(this, "Chambre indisponible sur cette période.",
@@ -357,5 +371,19 @@ public class ReserverPanel extends JPanel {
             message = "Erreur base de données : " + e.getMessage();
         }
         JOptionPane.showMessageDialog(this, message, "Erreur", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private static DatePicker creerDatePicker() {
+        DatePickerSettings settings = new DatePickerSettings(Locale.FRENCH);
+        settings.setFormatForDatesCommonEra(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
+        DatePicker datePicker = new DatePicker(settings);
+        // Date minimale = aujourd'hui : seules les dates du présent et du futur
+        // sont autorisées (doit être défini APRÈS la construction du DatePicker).
+        settings.setDateRangeLimits(LocalDate.now(), null);
+        return datePicker;
+    }
+
+    private static String formaterDate(LocalDate d) {
+        return d == null ? "" : FMT_DATE.format(d);
     }
 }

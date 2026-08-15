@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import javax.swing.JButton;
@@ -26,6 +27,8 @@ import com.hotel.model.Sejourner;
  * La date d'entrée est fixée à la date du jour par le DAO.
  */
 public class SejournerPanel extends JPanel {
+
+    private static final DateTimeFormatter FMT_DATE = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
     private final MainFrame parent;
     private final SejournerDAO sejournerDAO = new SejournerDAO();
@@ -115,7 +118,7 @@ public class SejournerPanel extends JPanel {
                 tableModel.addRow(new Object[]{
                         s.getIdSejour(),
                         s.getNumChambre(),
-                        s.getDateEntreeSejour(),
+                        formaterDate(s.getDateEntreeSejour()),
                         s.getNbrJour(),
                         s.getNomClient(),
                         s.getTelephone()
@@ -214,7 +217,7 @@ public class SejournerPanel extends JPanel {
         Chambre c = (Chambre) comboChambres.getSelectedItem();
         try {
             int id = Integer.parseInt(valeur(row, 0));
-            LocalDate dateEntree = LocalDate.parse(valeur(row, 2));
+            LocalDate dateEntree = LocalDate.parse(valeur(row, 2), FMT_DATE);
             Sejourner s = new Sejourner(id, c.getNumChambre(), dateEntree, lireJours(),
                     clientField.getText().trim(), telephoneField.getText().trim());
             sejournerDAO.modifier(s);
@@ -264,5 +267,9 @@ public class SejournerPanel extends JPanel {
             message = "Erreur base de données : " + e.getMessage();
         }
         JOptionPane.showMessageDialog(this, message, "Erreur", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private static String formaterDate(LocalDate d) {
+        return d == null ? "" : FMT_DATE.format(d);
     }
 }
