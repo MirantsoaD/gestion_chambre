@@ -1,7 +1,7 @@
 package com.hotel.ui;
 
 import java.awt.BorderLayout;
-import java.awt.FlowLayout;
+import java.awt.Font;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Locale;
 
 import javax.swing.JButton;
-import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -48,18 +47,22 @@ public class ChambreLibrePanel extends JPanel {
         this.parent = parent;
         setLayout(new BorderLayout());
 
-        // NORTH : formulaire
-        JPanel form = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        form.add(new JLabel("Date d'entrée :"));
+        // NORTH : critères de recherche
+        JPanel form = Style.panneauFormulaire("Critères de recherche");
+        form.add(Style.libelle("Date d'entrée :"));
         form.add(datePicker);
-        form.add(new JLabel("Jours :"));
+        form.add(Style.libelle("Jours :"));
         form.add(joursField);
         JButton searchButton = new JButton("Rechercher");
+        Style.boutonPrincipal(searchButton);
         searchButton.addActionListener(e -> rechercher());
         form.add(searchButton);
         add(form, BorderLayout.NORTH);
 
         // CENTER : tableau
+        table.setRowHeight(30);
+        table.getTableHeader().setFont(
+                table.getTableHeader().getFont().deriveFont(Font.BOLD, 12f));
         add(new JScrollPane(table), BorderLayout.CENTER);
     }
 
@@ -85,8 +88,8 @@ public class ChambreLibrePanel extends JPanel {
     private void rechercher() {
         LocalDate date = datePicker.getDate();
         if (date == null) {
-            JOptionPane.showMessageDialog(this, "Choisissez une date d'entrée.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Veuillez choisir une date d'entrée.",
+                    "Données invalides", JOptionPane.ERROR_MESSAGE);
             return;
         }
         int jours;
@@ -97,8 +100,8 @@ public class ChambreLibrePanel extends JPanel {
         }
         if (jours <= 0) {
             JOptionPane.showMessageDialog(this,
-                    "Nombre de jours invalide : entier > 0 attendu.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+                    "Le nombre de jours est invalide : un entier positif est attendu.",
+                    "Données invalides", JOptionPane.ERROR_MESSAGE);
             return;
         }
         try {
@@ -111,7 +114,7 @@ public class ChambreLibrePanel extends JPanel {
             }
             if (libres.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Aucune chambre libre sur cette période.",
-                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                        "Aucune disponibilité", JOptionPane.INFORMATION_MESSAGE);
             }
         } catch (SQLException e) {
             afficherErreurBD(e);
@@ -123,8 +126,9 @@ public class ChambreLibrePanel extends JPanel {
         if (e.getSQLState() != null && e.getSQLState().startsWith("23")) {
             message = "Opération impossible : cet enregistrement est référencé par d'autres données.";
         } else {
-            message = "Erreur base de données : " + e.getMessage();
+            message = "Erreur d'accès à la base de données : " + e.getMessage();
         }
-        JOptionPane.showMessageDialog(this, message, "Erreur", JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showMessageDialog(this, message, "Base de données",
+                JOptionPane.ERROR_MESSAGE);
     }
 }

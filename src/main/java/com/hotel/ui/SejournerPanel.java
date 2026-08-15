@@ -2,16 +2,17 @@ package com.hotel.ui;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.io.File;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
-import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -56,27 +57,36 @@ public class SejournerPanel extends JPanel {
         setLayout(new BorderLayout());
 
         // NORTH : formulaire
-        JPanel form = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        form.add(new JLabel("Chambre :"));
+        JPanel form = Style.panneauFormulaire("Informations séjour");
+        form.add(Style.libelle("Chambre :"));
         form.add(comboChambres);
-        form.add(new JLabel("Jours :"));
+        form.add(Style.libelle("Jours :"));
         form.add(joursField);
-        form.add(new JLabel("Client :"));
+        form.add(Style.libelle("Client :"));
         form.add(clientField);
-        form.add(new JLabel("Téléphone :"));
+        form.add(Style.libelle("Téléphone :"));
         form.add(telephoneField);
         add(form, BorderLayout.NORTH);
 
         // CENTER : tableau
+        table.setRowHeight(30);
+        table.getTableHeader().setFont(
+                table.getTableHeader().getFont().deriveFont(Font.BOLD, 12f));
         add(new JScrollPane(table), BorderLayout.CENTER);
 
-        // SOUTH : boutons
+        // SOUTH : boutons hiérarchisés
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttons.setBorder(BorderFactory.createEmptyBorder(14, 12, 14, 12));
         JButton addButton = new JButton("Ajouter");
         JButton modButton = new JButton("Modifier");
         JButton delButton = new JButton("Supprimer");
         JButton refreshButton = new JButton("Rafraîchir");
         JButton pdfButton = new JButton("Reçu PDF");
+        Style.boutonPrincipal(addButton);
+        Style.boutonSecondaire(modButton);
+        Style.boutonDestructif(delButton);
+        Style.boutonSecondaire(refreshButton);
+        Style.boutonSecondaire(pdfButton);
         addButton.addActionListener(e -> ajouter());
         modButton.addActionListener(e -> modifier());
         delButton.addActionListener(e -> supprimer());
@@ -180,14 +190,14 @@ public class SejournerPanel extends JPanel {
 
     private boolean validerSaisie() {
         if (comboChambres.getSelectedItem() == null) {
-            JOptionPane.showMessageDialog(this, "Choisissez une chambre.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Veuillez choisir une chambre.",
+                    "Données invalides", JOptionPane.ERROR_MESSAGE);
             return false;
         }
         if (lireJours() <= 0) {
             JOptionPane.showMessageDialog(this,
-                    "Nombre de jours invalide : entier > 0 attendu.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+                    "Le nombre de jours est invalide : un entier positif est attendu.",
+                    "Données invalides", JOptionPane.ERROR_MESSAGE);
             return false;
         }
         return true;
@@ -203,8 +213,8 @@ public class SejournerPanel extends JPanel {
                     clientField.getText().trim(), telephoneField.getText().trim());
             sejournerDAO.ajouter(s);
             JOptionPane.showMessageDialog(this,
-                    "Séjour enregistré. Le solde a été mis à jour.",
-                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+                    "Le client a été enregistré. Le solde a été mis à jour.",
+                    "Séjour enregistré", JOptionPane.INFORMATION_MESSAGE);
             apresEcriture();
         } catch (SQLException e) {
             afficherErreurBD(e);
@@ -214,8 +224,8 @@ public class SejournerPanel extends JPanel {
     private void modifier() {
         int row = table.getSelectedRow();
         if (row < 0) {
-            JOptionPane.showMessageDialog(this, "Sélectionnez un séjour à modifier.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Veuillez sélectionner un séjour à modifier.",
+                    "Sélection requise", JOptionPane.ERROR_MESSAGE);
             return;
         }
         if (!validerSaisie()) {
@@ -228,8 +238,8 @@ public class SejournerPanel extends JPanel {
             Sejourner s = new Sejourner(id, c.getNumChambre(), dateEntree, lireJours(),
                     clientField.getText().trim(), telephoneField.getText().trim());
             sejournerDAO.modifier(s);
-            JOptionPane.showMessageDialog(this, "Séjour modifié.",
-                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Le séjour a été modifié.",
+                    "Séjour modifié", JOptionPane.INFORMATION_MESSAGE);
             apresEcriture();
         } catch (SQLException e) {
             afficherErreurBD(e);
@@ -239,22 +249,23 @@ public class SejournerPanel extends JPanel {
     private void supprimer() {
         int row = table.getSelectedRow();
         if (row < 0) {
-            JOptionPane.showMessageDialog(this, "Sélectionnez un séjour à supprimer.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Veuillez sélectionner un séjour à supprimer.",
+                    "Sélection requise", JOptionPane.ERROR_MESSAGE);
             return;
         }
         int id = Integer.parseInt(valeur(row, 0));
         String montant = String.valueOf(tableModel.getValueAt(row, 6));
         int choix = JOptionPane.showConfirmDialog(this,
-                "Supprimer ce séjour ? Le solde sera diminué de " + montant + ".",
-                "Confirmation", JOptionPane.YES_NO_OPTION);
+                "Voulez-vous vraiment supprimer ce séjour ?\nLe solde sera diminué de "
+                        + montant + ".",
+                "Confirmation de suppression", JOptionPane.YES_NO_OPTION);
         if (choix != JOptionPane.YES_OPTION) {
             return;
         }
         try {
             sejournerDAO.supprimer(id);
-            JOptionPane.showMessageDialog(this, "Séjour supprimé.",
-                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Le séjour a été retiré du registre.",
+                    "Séjour supprimé", JOptionPane.INFORMATION_MESSAGE);
             apresEcriture();
         } catch (SQLException e) {
             afficherErreurBD(e);
@@ -266,8 +277,8 @@ public class SejournerPanel extends JPanel {
         int row = table.getSelectedRow();
         if (row < 0) {
             JOptionPane.showMessageDialog(this,
-                    "Sélectionnez un séjour pour générer le reçu.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+                    "Veuillez sélectionner un séjour pour générer le reçu.",
+                    "Sélection requise", JOptionPane.ERROR_MESSAGE);
             return;
         }
         String numero = "SEJ-" + valeur(row, 0);
@@ -285,12 +296,12 @@ public class SejournerPanel extends JPanel {
         try {
             File fichier = chooser.getSelectedFile();
             PdfRecuGenerator.genererRecu(fichier, numero, client, chambre, dateEntree, jours, montant);
-            JOptionPane.showMessageDialog(this, "Reçu généré : " + fichier.getAbsolutePath(),
-                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Le reçu a été généré : " + fichier.getAbsolutePath(),
+                    "Reçu généré", JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this,
-                    "Erreur lors de la génération du PDF : " + e.getMessage(),
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+                    "Une erreur est survenue lors de la génération du PDF : " + e.getMessage(),
+                    "Reçu PDF", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -306,9 +317,10 @@ public class SejournerPanel extends JPanel {
         if (e.getSQLState() != null && e.getSQLState().startsWith("23")) {
             message = "Opération impossible : cet enregistrement est référencé par d'autres données.";
         } else {
-            message = "Erreur base de données : " + e.getMessage();
+            message = "Erreur d'accès à la base de données : " + e.getMessage();
         }
-        JOptionPane.showMessageDialog(this, message, "Erreur", JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showMessageDialog(this, message, "Base de données",
+                JOptionPane.ERROR_MESSAGE);
     }
 
     private static String formaterDate(LocalDate d) {

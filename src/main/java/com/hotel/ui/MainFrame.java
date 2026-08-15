@@ -2,10 +2,10 @@ package com.hotel.ui;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
-import java.awt.FlowLayout;
 import java.awt.Font;
 import java.sql.SQLException;
 
+import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -17,7 +17,7 @@ import com.hotel.dao.SoldeDAO;
 
 /**
  * Fenêtre principale : onglets Chambres, Réservations, Occupations et Séjours,
- * avec un label affichant le solde actuel en haut.
+ * avec en-tête « Hôtel de Prestige » et solde actuel encadré en haut à droite.
  */
 public class MainFrame extends JFrame {
 
@@ -31,20 +31,38 @@ public class MainFrame extends JFrame {
     private final ChambreLibrePanel chambreLibrePanel;
 
     public MainFrame() {
-        super("Gestion des Réservations d'Hôtel");
+        super("Hôtel de Prestige — Gestion des Réservations");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(950, 650);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
 
-        // NORTH : solde actuel
-        JPanel northPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        northPanel.add(new JLabel("Solde actuel : "));
-        soldeLabel.setFont(soldeLabel.getFont().deriveFont(Font.BOLD));
-        northPanel.add(soldeLabel);
+        // NORTH : en-tête (gauche) + solde encadré (droite)
+        JPanel northPanel = new JPanel(new BorderLayout());
+        northPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 14, 0));
+
+        JLabel headerLabel = new JLabel("Hôtel de Prestige — Gestion des Réservations");
+        headerLabel.setFont(Style.policeTitre(22));
+        headerLabel.setForeground(Style.OR_LAITON);
+        headerLabel.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
+        northPanel.add(headerLabel, BorderLayout.WEST);
+
+        JPanel soldePanel = new JPanel(new BorderLayout());
+        soldePanel.setBackground(Style.FOND_SECONDAIRE);
+        soldePanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Style.OR_LAITON, 1),
+                BorderFactory.createEmptyBorder(10, 14, 10, 14)));
+        JLabel soldeLibelle = new JLabel("Solde actuel :  ");
+        soldeLibelle.setForeground(Style.IVOIRE);
+        soldeLabel.setForeground(Style.OR_PALE);
+        soldeLabel.setFont(soldeLabel.getFont().deriveFont(Font.BOLD, 15f));
         JButton rectifierButton = new JButton("Rectifier le solde");
+        Style.boutonSecondaire(rectifierButton);
         rectifierButton.addActionListener(e -> rectifierSolde());
-        northPanel.add(rectifierButton);
+        soldePanel.add(soldeLibelle, BorderLayout.WEST);
+        soldePanel.add(soldeLabel, BorderLayout.CENTER);
+        soldePanel.add(rectifierButton, BorderLayout.EAST);
+        northPanel.add(soldePanel, BorderLayout.EAST);
         add(northPanel, BorderLayout.NORTH);
 
         // CENTER : onglets
@@ -90,7 +108,7 @@ public class MainFrame extends JFrame {
     /** Demande un montant à ajouter ou retirer du solde (correction manuelle). */
     private void rectifierSolde() {
         String saisie = JOptionPane.showInputDialog(this,
-                "Montant à ajouter au solde (négatif pour retirer) :",
+                "Montant à ajouter au solde (un montant négatif pour retirer) :",
                 "Rectifier le solde", JOptionPane.QUESTION_MESSAGE);
         if (saisie == null) {
             return; // annulé
@@ -98,17 +116,17 @@ public class MainFrame extends JFrame {
         try {
             int montant = Integer.parseInt(saisie.trim());
             new SoldeDAO().ajouterAuSolde(montant);
-            JOptionPane.showMessageDialog(this, "Solde rectifié.",
-                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Le solde a été rectifié avec succès.",
+                    "Solde rectifié", JOptionPane.INFORMATION_MESSAGE);
             rafraichirSolde();
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(this,
-                    "Montant invalide : entier attendu (ex : -500).",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+                    "Le montant saisi est invalide : un entier est attendu (ex : -500).",
+                    "Données invalides", JOptionPane.ERROR_MESSAGE);
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(this,
-                    "Erreur base de données : " + e.getMessage(),
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+                    "Erreur d'accès à la base de données : " + e.getMessage(),
+                    "Base de données", JOptionPane.ERROR_MESSAGE);
         }
     }
 }

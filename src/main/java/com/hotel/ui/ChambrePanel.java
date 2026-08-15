@@ -2,11 +2,12 @@ package com.hotel.ui;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.sql.SQLException;
 import java.util.List;
 
+import javax.swing.BorderFactory;
 import javax.swing.JButton;
-import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -44,26 +45,34 @@ public class ChambrePanel extends JPanel {
         setLayout(new BorderLayout());
 
         // NORTH : formulaire
-        JPanel form = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        form.add(new JLabel("Numéro :"));
+        JPanel form = Style.panneauFormulaire("Informations chambre");
+        form.add(Style.libelle("Numéro :"));
         form.add(numField);
-        form.add(new JLabel("Design :"));
+        form.add(Style.libelle("Design :"));
         form.add(designField);
-        form.add(new JLabel("Type :"));
+        form.add(Style.libelle("Type :"));
         form.add(typeField);
-        form.add(new JLabel("Prix / nuitée :"));
+        form.add(Style.libelle("Prix / nuitée :"));
         form.add(prixField);
         add(form, BorderLayout.NORTH);
 
         // CENTER : tableau
+        table.setRowHeight(30);
+        table.getTableHeader().setFont(
+                table.getTableHeader().getFont().deriveFont(Font.BOLD, 12f));
         add(new JScrollPane(table), BorderLayout.CENTER);
 
-        // SOUTH : boutons
+        // SOUTH : boutons hiérarchisés
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttons.setBorder(BorderFactory.createEmptyBorder(14, 12, 14, 12));
         JButton addButton = new JButton("Ajouter");
         JButton modButton = new JButton("Modifier");
         JButton delButton = new JButton("Supprimer");
         JButton refreshButton = new JButton("Rafraîchir");
+        Style.boutonPrincipal(addButton);
+        Style.boutonSecondaire(modButton);
+        Style.boutonDestructif(delButton);
+        Style.boutonSecondaire(refreshButton);
         addButton.addActionListener(e -> ajouter());
         modButton.addActionListener(e -> modifier());
         delButton.addActionListener(e -> supprimer());
@@ -137,13 +146,14 @@ public class ChambrePanel extends JPanel {
 
     private boolean validerFormulaire() {
         if (numField.getText().trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Numéro de chambre obligatoire.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Le numéro de chambre est obligatoire.",
+                    "Données invalides", JOptionPane.ERROR_MESSAGE);
             return false;
         }
         if (lirePrix() <= 0) {
-            JOptionPane.showMessageDialog(this, "Prix invalide : entier > 0 attendu.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this,
+                    "Le prix est invalide : un entier positif est attendu.",
+                    "Données invalides", JOptionPane.ERROR_MESSAGE);
             return false;
         }
         return true;
@@ -159,8 +169,8 @@ public class ChambrePanel extends JPanel {
                     designField.getText().trim(),
                     typeField.getText().trim(),
                     lirePrix()));
-            JOptionPane.showMessageDialog(this, "Chambre ajoutée.",
-                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "La chambre a bien été ajoutée à l'inventaire.",
+                    "Chambre ajoutée", JOptionPane.INFORMATION_MESSAGE);
             apresEcriture();
         } catch (SQLException e) {
             afficherErreurBD(e);
@@ -170,8 +180,8 @@ public class ChambrePanel extends JPanel {
     private void modifier() {
         int row = table.getSelectedRow();
         if (row < 0) {
-            JOptionPane.showMessageDialog(this, "Sélectionnez une chambre à modifier.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Veuillez sélectionner une chambre à modifier.",
+                    "Sélection requise", JOptionPane.ERROR_MESSAGE);
             return;
         }
         if (!validerFormulaire()) {
@@ -183,8 +193,8 @@ public class ChambrePanel extends JPanel {
                     designField.getText().trim(),
                     typeField.getText().trim(),
                     lirePrix()));
-            JOptionPane.showMessageDialog(this, "Chambre modifiée.",
-                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "La chambre a bien été modifiée.",
+                    "Chambre modifiée", JOptionPane.INFORMATION_MESSAGE);
             apresEcriture();
         } catch (SQLException e) {
             afficherErreurBD(e);
@@ -194,21 +204,22 @@ public class ChambrePanel extends JPanel {
     private void supprimer() {
         int row = table.getSelectedRow();
         if (row < 0) {
-            JOptionPane.showMessageDialog(this, "Sélectionnez une chambre à supprimer.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Veuillez sélectionner une chambre à supprimer.",
+                    "Sélection requise", JOptionPane.ERROR_MESSAGE);
             return;
         }
         String num = valeur(row, 0);
         int choix = JOptionPane.showConfirmDialog(this,
-                "Supprimer la chambre " + num + " ?", "Confirmation",
+                "Voulez-vous vraiment supprimer la chambre " + num + " ?",
+                "Confirmation de suppression",
                 JOptionPane.YES_NO_OPTION);
         if (choix != JOptionPane.YES_OPTION) {
             return;
         }
         try {
             chambreDAO.supprimer(num);
-            JOptionPane.showMessageDialog(this, "Chambre supprimée.",
-                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "La chambre a été retirée de l'inventaire.",
+                    "Chambre supprimée", JOptionPane.INFORMATION_MESSAGE);
             apresEcriture();
         } catch (SQLException e) {
             afficherErreurBD(e);
@@ -227,8 +238,9 @@ public class ChambrePanel extends JPanel {
         if (e.getSQLState() != null && e.getSQLState().startsWith("23")) {
             message = "Opération impossible : cet enregistrement est référencé par d'autres données.";
         } else {
-            message = "Erreur base de données : " + e.getMessage();
+            message = "Erreur d'accès à la base de données : " + e.getMessage();
         }
-        JOptionPane.showMessageDialog(this, message, "Erreur", JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showMessageDialog(this, message, "Base de données",
+                JOptionPane.ERROR_MESSAGE);
     }
 }

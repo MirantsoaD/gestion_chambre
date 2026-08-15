@@ -65,12 +65,14 @@ public final class MailSender {
         corps.append("Bonjour ");
         corps.append(r.getNomClient() == null ? "" : r.getNomClient());
         corps.append(",\n\n");
-        corps.append("Votre réservation a bien été enregistrée :\n\n");
+        corps.append("Nous avons le plaisir de confirmer votre réservation.\n");
+        corps.append("Voici le récapitulatif de votre séjour :\n\n");
         corps.append("  Numéro de chambre   : ").append(r.getNumChambre()).append('\n');
         corps.append("  Date de réservation : ").append(r.getDateReserv()).append('\n');
         corps.append("  Date d'entrée       : ").append(r.getDateEntree()).append('\n');
         corps.append("  Nombre de jours     : ").append(r.getNbrJour()).append('\n');
         corps.append("  Nom du client       : ").append(r.getNomClient()).append("\n\n");
+        corps.append("Nous nous réjouissons de vous accueillir prochainement.\n");
         corps.append("À bientôt dans notre hôtel !\n");
         message.setText(corps.toString(), "UTF-8");
 

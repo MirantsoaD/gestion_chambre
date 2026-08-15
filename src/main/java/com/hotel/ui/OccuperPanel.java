@@ -2,6 +2,7 @@ package com.hotel.ui;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.io.File;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -9,10 +10,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
-import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -54,23 +55,32 @@ public class OccuperPanel extends JPanel {
         setLayout(new BorderLayout());
 
         // NORTH : sélection de la réservation + bouton d'arrivée
-        JPanel form = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        form.add(new JLabel("Réservation :"));
+        JPanel form = Style.panneauFormulaire("Arrivée d'un client");
+        form.add(Style.libelle("Réservation :"));
         form.add(comboReservations);
         JButton arriveeButton = new JButton("Enregistrer l'arrivée");
+        Style.boutonPrincipal(arriveeButton);
         arriveeButton.addActionListener(e -> enregistrerArrivee());
         form.add(arriveeButton);
         add(form, BorderLayout.NORTH);
 
         // CENTER : tableau
+        table.setRowHeight(30);
+        table.getTableHeader().setFont(
+                table.getTableHeader().getFont().deriveFont(Font.BOLD, 12f));
         add(new JScrollPane(table), BorderLayout.CENTER);
 
-        // SOUTH : boutons
+        // SOUTH : boutons hiérarchisés
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttons.setBorder(BorderFactory.createEmptyBorder(14, 12, 14, 12));
         JButton delButton = new JButton("Supprimer");
         JButton modButton = new JButton("Modifier");
         JButton refreshButton = new JButton("Rafraîchir");
         JButton pdfButton = new JButton("Reçu PDF");
+        Style.boutonDestructif(delButton);
+        Style.boutonSecondaire(modButton);
+        Style.boutonSecondaire(refreshButton);
+        Style.boutonSecondaire(pdfButton);
         delButton.addActionListener(e -> supprimer());
         modButton.addActionListener(e -> modifier());
         refreshButton.addActionListener(e -> chargerTable());
@@ -136,16 +146,17 @@ public class OccuperPanel extends JPanel {
     private void enregistrerArrivee() {
         int index = comboReservations.getSelectedIndex();
         if (index < 0 || listComboReservations.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Aucune réservation sélectionnée.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this,
+                    "Veuillez sélectionner une réservation à enregistrer.",
+                    "Données invalides", JOptionPane.ERROR_MESSAGE);
             return;
         }
         Reserver r = listComboReservations.get(index);
         try {
             occuperDAO.ajouter(new Occuper(0, r.getIdReserv()));
             JOptionPane.showMessageDialog(this,
-                    "Arrivée enregistrée. Le solde a été mis à jour.",
-                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+                    "Le client a été enregistré à l'arrivée. Le solde a été mis à jour.",
+                    "Arrivée enregistrée", JOptionPane.INFORMATION_MESSAGE);
             apresEcriture();
         } catch (SQLException e) {
             afficherErreurBD(e);
@@ -155,22 +166,23 @@ public class OccuperPanel extends JPanel {
     private void supprimer() {
         int row = table.getSelectedRow();
         if (row < 0) {
-            JOptionPane.showMessageDialog(this, "Sélectionnez une occupation à supprimer.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Veuillez sélectionner une occupation à retirer.",
+                    "Sélection requise", JOptionPane.ERROR_MESSAGE);
             return;
         }
         int idOccup = Integer.parseInt(String.valueOf(tableModel.getValueAt(row, 0)));
         String montant = String.valueOf(tableModel.getValueAt(row, 6));
         int choix = JOptionPane.showConfirmDialog(this,
-                "Supprimer cette occupation ? Le solde sera diminué de " + montant + ".",
-                "Confirmation", JOptionPane.YES_NO_OPTION);
+                "Voulez-vous vraiment retirer cette occupation ?\nLe solde sera diminué de "
+                        + montant + ".",
+                "Confirmation de suppression", JOptionPane.YES_NO_OPTION);
         if (choix != JOptionPane.YES_OPTION) {
             return;
         }
         try {
             occuperDAO.supprimer(idOccup);
-            JOptionPane.showMessageDialog(this, "Occupation supprimée.",
-                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "L'occupation a été retirée du registre.",
+                    "Occupation supprimée", JOptionPane.INFORMATION_MESSAGE);
             apresEcriture();
         } catch (SQLException e) {
             afficherErreurBD(e);
@@ -181,37 +193,37 @@ public class OccuperPanel extends JPanel {
     private void modifier() {
         int row = table.getSelectedRow();
         if (row < 0) {
-            JOptionPane.showMessageDialog(this, "Sélectionnez une occupation à modifier.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Veuillez sélectionner une occupation à modifier.",
+                    "Sélection requise", JOptionPane.ERROR_MESSAGE);
             return;
         }
         int idOccup = Integer.parseInt(String.valueOf(tableModel.getValueAt(row, 0)));
         int index = comboReservations.getSelectedIndex();
         if (index < 0 || listComboReservations.isEmpty()) {
             JOptionPane.showMessageDialog(this,
-                    "Aucune réservation disponible pour le transfert.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+                    "Aucune réservation n'est disponible pour le transfert.",
+                    "Données invalides", JOptionPane.ERROR_MESSAGE);
             return;
         }
         Reserver cible = listComboReservations.get(index);
         int choix = JOptionPane.showConfirmDialog(this,
-                "Rattacher l'occupation à la réservation #" + cible.getIdReserv()
-                        + " ?\nLe solde sera ajusté.",
-                "Confirmation", JOptionPane.YES_NO_OPTION);
+                "Voulez-vous vraiment rattacher cette occupation à la réservation #"
+                        + cible.getIdReserv() + " ?\nLe solde sera ajusté.",
+                "Confirmation de transfert", JOptionPane.YES_NO_OPTION);
         if (choix != JOptionPane.YES_OPTION) {
             return;
         }
         try {
             occuperDAO.modifier(idOccup, cible.getIdReserv());
             JOptionPane.showMessageDialog(this,
-                    "Occupation modifiée. Le solde a été ajusté.",
-                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+                    "L'occupation a été transférée. Le solde a été ajusté.",
+                    "Occupation transférée", JOptionPane.INFORMATION_MESSAGE);
             apresEcriture();
         } catch (SQLException e) {
             afficherErreurBD(e);
         } catch (IllegalArgumentException e) {
             JOptionPane.showMessageDialog(this, e.getMessage(),
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+                    "Données invalides", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -220,8 +232,8 @@ public class OccuperPanel extends JPanel {
         int row = table.getSelectedRow();
         if (row < 0) {
             JOptionPane.showMessageDialog(this,
-                    "Sélectionnez une occupation pour générer le reçu.",
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+                    "Veuillez sélectionner une occupation pour générer le reçu.",
+                    "Sélection requise", JOptionPane.ERROR_MESSAGE);
             return;
         }
         String numero = "OCC-" + String.valueOf(tableModel.getValueAt(row, 0));
@@ -240,12 +252,12 @@ public class OccuperPanel extends JPanel {
         try {
             File fichier = chooser.getSelectedFile();
             PdfRecuGenerator.genererRecu(fichier, numero, client, chambre, dateEntree, jours, montant);
-            JOptionPane.showMessageDialog(this, "Reçu généré : " + fichier.getAbsolutePath(),
-                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Le reçu a été généré : " + fichier.getAbsolutePath(),
+                    "Reçu généré", JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this,
-                    "Erreur lors de la génération du PDF : " + e.getMessage(),
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
+                    "Une erreur est survenue lors de la génération du PDF : " + e.getMessage(),
+                    "Reçu PDF", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -261,9 +273,10 @@ public class OccuperPanel extends JPanel {
         if (e.getSQLState() != null && e.getSQLState().startsWith("23")) {
             message = "Opération impossible : cet enregistrement est référencé par d'autres données.";
         } else {
-            message = "Erreur base de données : " + e.getMessage();
+            message = "Erreur d'accès à la base de données : " + e.getMessage();
         }
-        JOptionPane.showMessageDialog(this, message, "Erreur", JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showMessageDialog(this, message, "Base de données",
+                JOptionPane.ERROR_MESSAGE);
     }
 
     private static String formaterDate(LocalDate d) {

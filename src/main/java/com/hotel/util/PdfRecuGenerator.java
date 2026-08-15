@@ -45,11 +45,15 @@ public final class PdfRecuGenerator {
         PdfWriter.getInstance(document, new FileOutputStream(fichier));
         document.open();
 
-        Font titreFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16);
+        Font titreFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
         Font boldFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12);
         Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 12);
 
-        Paragraph titre = new Paragraph("REÇU DE PAIEMENT", titreFont);
+        Paragraph hotel = new Paragraph("Hôtel de Prestige", titreFont);
+        hotel.setAlignment(Element.ALIGN_CENTER);
+        document.add(hotel);
+
+        Paragraph titre = new Paragraph("Reçu de paiement", boldFont);
         titre.setAlignment(Element.ALIGN_CENTER);
         document.add(titre);
 
@@ -69,7 +73,7 @@ public final class PdfRecuGenerator {
 
         document.add(new Paragraph(" "));
 
-        Paragraph merci = new Paragraph("Merci de votre visite !", normalFont);
+        Paragraph merci = new Paragraph("Nous vous remercions de votre visite.", normalFont);
         merci.setAlignment(Element.ALIGN_CENTER);
         document.add(merci);
 
