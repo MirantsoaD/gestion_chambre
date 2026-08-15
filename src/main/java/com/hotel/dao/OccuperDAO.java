@@ -43,14 +43,7 @@ public class OccuperDAO {
                     }
                 }
 
-                // 3) Insérer l'occupation.
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "INSERT INTO occuper (id_reserv) VALUES (?)")) {
-                    ps.setInt(1, o.getIdReserv());
-                    ps.executeUpdate();
-                }
-
-                // 4) Calculer le montant : prix de la nuitée * nombre de jours de la réservation.
+                // 3) Calculer le montant : prix de la nuitée * nombre de jours de la réservation.
                 int montant = 0;
                 try (PreparedStatement ps = conn.prepareStatement(
                         "SELECT c.prix_nuitee * r.nbr_jour AS montant "
@@ -62,6 +55,15 @@ public class OccuperDAO {
                             montant = rs.getInt("montant");
                         }
                     }
+                }
+                o.setMontant(montant);
+
+                // 4) Insérer l'occupation (montant stocké pour les remboursements futurs).
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "INSERT INTO occuper (id_reserv, montant) VALUES (?, ?)")) {
+                    ps.setInt(1, o.getIdReserv());
+                    ps.setInt(2, montant);
+                    ps.executeUpdate();
                 }
 
                 // 5) Créditer le solde (même connexion => transaction).
@@ -89,6 +91,7 @@ public class OccuperDAO {
                 Occuper o = new Occuper();
                 o.setIdOccup(rs.getInt("id_occup"));
                 o.setIdReserv(rs.getInt("id_reserv"));
+                o.setMontant(rs.getInt("montant"));
                 liste.add(o);
             }
         }
@@ -96,15 +99,47 @@ public class OccuperDAO {
     }
 
     /**
-     * Supprime une occupation.
-     * NB : le solde n'est PAS décrémenté (règle métier : on ne rembourse pas).
+     * Supprime une occupation et rembourse le montant stocké
+     * (le solde diminue du montant crédité à l'arrivée).
+     *
+     * @throws IllegalArgumentException si l'occupation n'existe pas
      */
     public void supprimer(int idOccup) throws SQLException {
-        String sql = "DELETE FROM occuper WHERE id_occup = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idOccup);
-            ps.executeUpdate();
+        try (Connection conn = DBConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // 1) Lire le montant stocké de l'occupation.
+                int montant;
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT montant FROM occuper WHERE id_occup = ?")) {
+                    ps.setInt(1, idOccup);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            conn.rollback();
+                            throw new IllegalArgumentException(
+                                    "Occupation introuvable : " + idOccup);
+                        }
+                        montant = rs.getInt("montant");
+                    }
+                }
+
+                // 2) Supprimer l'occupation.
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "DELETE FROM occuper WHERE id_occup = ?")) {
+                    ps.setInt(1, idOccup);
+                    ps.executeUpdate();
+                }
+
+                // 3) Rembourser le montant (delta négatif ; 0 pour l'ancien historique).
+                new SoldeDAO().ajouterAuSolde(conn, -montant);
+
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
         }
     }
 }

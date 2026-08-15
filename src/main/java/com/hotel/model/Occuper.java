@@ -7,6 +7,8 @@ public class Occuper {
 
     private int idOccup;
     private int idReserv;
+    /** Montant crédité au solde lors de l'arrivée (prix de la nuitée * nombre de jours). */
+    private int montant;
 
     public Occuper() {
     }
@@ -14,6 +16,12 @@ public class Occuper {
     public Occuper(int idOccup, int idReserv) {
         this.idOccup = idOccup;
         this.idReserv = idReserv;
+    }
+
+    public Occuper(int idOccup, int idReserv, int montant) {
+        this.idOccup = idOccup;
+        this.idReserv = idReserv;
+        this.montant = montant;
     }
 
     public int getIdOccup() {
@@ -30,5 +38,13 @@ public class Occuper {
 
     public void setIdReserv(int idReserv) {
         this.idReserv = idReserv;
+    }
+
+    public int getMontant() {
+        return montant;
+    }
+
+    public void setMontant(int montant) {
+        this.montant = montant;
     }
 }

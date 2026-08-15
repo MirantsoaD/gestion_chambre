@@ -38,7 +38,7 @@ public class OccuperPanel extends JPanel {
 
     private final DefaultTableModel tableModel = new DefaultTableModel(
             new String[]{"ID occupation", "Réservation", "Chambre", "Client",
-                    "Date entrée", "Jours"}, 0) {
+                    "Date entrée", "Jours", "Montant"}, 0) {
         @Override
         public boolean isCellEditable(int row, int column) {
             return false;
@@ -107,10 +107,11 @@ public class OccuperPanel extends JPanel {
                             r.getNumChambre(),
                             r.getNomClient(),
                             formaterDate(r.getDateEntree()),
-                            r.getNbrJour()
+                            r.getNbrJour(),
+                            o.getMontant()
                     });
                 } else {
-                    tableModel.addRow(new Object[]{o.getIdOccup(), "—", "—", "—", "—", "—"});
+                    tableModel.addRow(new Object[]{o.getIdOccup(), "—", "—", "—", "—", "—", "—"});
                 }
             }
         } catch (SQLException e) {
@@ -150,7 +151,9 @@ public class OccuperPanel extends JPanel {
             return;
         }
         int idOccup = Integer.parseInt(String.valueOf(tableModel.getValueAt(row, 0)));
-        int choix = JOptionPane.showConfirmDialog(this, "Supprimer cette occupation ?",
+        String montant = String.valueOf(tableModel.getValueAt(row, 6));
+        int choix = JOptionPane.showConfirmDialog(this,
+                "Supprimer cette occupation ? Le solde sera diminué de " + montant + ".",
                 "Confirmation", JOptionPane.YES_NO_OPTION);
         if (choix != JOptionPane.YES_OPTION) {
             return;

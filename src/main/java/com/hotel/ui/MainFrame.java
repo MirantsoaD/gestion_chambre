@@ -6,8 +6,10 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.sql.SQLException;
 
+import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
@@ -39,6 +41,9 @@ public class MainFrame extends JFrame {
         northPanel.add(new JLabel("Solde actuel : "));
         soldeLabel.setFont(soldeLabel.getFont().deriveFont(Font.BOLD));
         northPanel.add(soldeLabel);
+        JButton rectifierButton = new JButton("Rectifier le solde");
+        rectifierButton.addActionListener(e -> rectifierSolde());
+        northPanel.add(rectifierButton);
         add(northPanel, BorderLayout.NORTH);
 
         // CENTER : onglets
@@ -76,6 +81,31 @@ public class MainFrame extends JFrame {
             soldeLabel.setText(String.valueOf(new SoldeDAO().getSolde()));
         } catch (SQLException e) {
             soldeLabel.setText("?");
+        }
+    }
+
+    /** Demande un montant à ajouter ou retirer du solde (correction manuelle). */
+    private void rectifierSolde() {
+        String saisie = JOptionPane.showInputDialog(this,
+                "Montant à ajouter au solde (négatif pour retirer) :",
+                "Rectifier le solde", JOptionPane.QUESTION_MESSAGE);
+        if (saisie == null) {
+            return; // annulé
+        }
+        try {
+            int montant = Integer.parseInt(saisie.trim());
+            new SoldeDAO().ajouterAuSolde(montant);
+            JOptionPane.showMessageDialog(this, "Solde rectifié.",
+                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+            rafraichirSolde();
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Montant invalide : entier attendu (ex : -500).",
+                    "Erreur", JOptionPane.ERROR_MESSAGE);
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this,
+                    "Erreur base de données : " + e.getMessage(),
+                    "Erreur", JOptionPane.ERROR_MESSAGE);
         }
     }
 }

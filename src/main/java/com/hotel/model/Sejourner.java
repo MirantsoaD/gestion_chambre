@@ -13,6 +13,8 @@ public class Sejourner {
     private int nbrJour;
     private String nomClient;
     private String telephone;
+    /** Montant crédité au solde à l'enregistrement du séjour (prix de la nuitée * nombre de jours). */
+    private int montant;
 
     public Sejourner() {
     }
@@ -25,6 +27,12 @@ public class Sejourner {
         this.nbrJour = nbrJour;
         this.nomClient = nomClient;
         this.telephone = telephone;
+    }
+
+    public Sejourner(int idSejour, String numChambre, LocalDate dateEntreeSejour,
+                     int nbrJour, String nomClient, String telephone, int montant) {
+        this(idSejour, numChambre, dateEntreeSejour, nbrJour, nomClient, telephone);
+        this.montant = montant;
     }
 
     public int getIdSejour() {
@@ -73,5 +81,13 @@ public class Sejourner {
 
     public void setTelephone(String telephone) {
         this.telephone = telephone;
+    }
+
+    public int getMontant() {
+        return montant;
+    }
+
+    public void setMontant(int montant) {
+        this.montant = montant;
     }
 }

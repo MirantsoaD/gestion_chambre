@@ -316,13 +316,20 @@ public class ReserverPanel extends JPanel {
             return;
         }
         int id = Integer.parseInt(valeur(row, 0));
-        int choix = JOptionPane.showConfirmDialog(this,
-                "Annuler la réservation #" + id + " ?", "Confirmation",
-                JOptionPane.YES_NO_OPTION);
-        if (choix != JOptionPane.YES_OPTION) {
-            return;
-        }
         try {
+            if (reserverDAO.isOccupee(id)) {
+                JOptionPane.showMessageDialog(this,
+                        "Cette réservation est déjà occupée (client déjà arrivé).\n"
+                        + "Supprimez d'abord l'occupation dans l'onglet Occupations.",
+                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            int choix = JOptionPane.showConfirmDialog(this,
+                    "Annuler la réservation #" + id + " ?", "Confirmation",
+                    JOptionPane.YES_NO_OPTION);
+            if (choix != JOptionPane.YES_OPTION) {
+                return;
+            }
             reserverDAO.annuler(id);
             JOptionPane.showMessageDialog(this, "Réservation annulée.",
                     "Succès", JOptionPane.INFORMATION_MESSAGE);

@@ -30,7 +30,9 @@ CREATE TABLE IF NOT EXISTS occuper (
     id_occup SERIAL PRIMARY KEY,
     -- UNIQUE : une réservation ne peut être occupée qu'une seule fois
     -- (protège aussi le solde contre un double encaissement)
-    id_reserv INTEGER REFERENCES reserver(id_reserv) UNIQUE
+    id_reserv INTEGER REFERENCES reserver(id_reserv) UNIQUE,
+    -- Montant crédité au solde lors de l'arrivée (permet remboursements/rectifications)
+    montant INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS sejourner (
@@ -39,7 +41,9 @@ CREATE TABLE IF NOT EXISTS sejourner (
     date_entree_sejour DATE NOT NULL,
     nbr_jour INTEGER NOT NULL,
     nom_client VARCHAR(100),
-    telephone VARCHAR(30)
+    telephone VARCHAR(30),
+    -- Montant crédité au solde à l'enregistrement (permet remboursements/rectifications)
+    montant INTEGER NOT NULL DEFAULT 0
 );
 
 -- Ligne unique de solde au départ (id = 1)

@@ -40,7 +40,7 @@ public class SejournerPanel extends JPanel {
     private final JTextField telephoneField = new JTextField(12);
 
     private final DefaultTableModel tableModel = new DefaultTableModel(
-            new String[]{"ID", "Chambre", "Date entrée", "Jours", "Client", "Téléphone"}, 0) {
+            new String[]{"ID", "Chambre", "Date entrée", "Jours", "Client", "Téléphone", "Montant"}, 0) {
         @Override
         public boolean isCellEditable(int row, int column) {
             return false;
@@ -121,7 +121,8 @@ public class SejournerPanel extends JPanel {
                         formaterDate(s.getDateEntreeSejour()),
                         s.getNbrJour(),
                         s.getNomClient(),
-                        s.getTelephone()
+                        s.getTelephone(),
+                        s.getMontant()
                 });
             }
         } catch (SQLException e) {
@@ -237,7 +238,9 @@ public class SejournerPanel extends JPanel {
             return;
         }
         int id = Integer.parseInt(valeur(row, 0));
-        int choix = JOptionPane.showConfirmDialog(this, "Supprimer ce séjour ?",
+        String montant = String.valueOf(tableModel.getValueAt(row, 6));
+        int choix = JOptionPane.showConfirmDialog(this,
+                "Supprimer ce séjour ? Le solde sera diminué de " + montant + ".",
                 "Confirmation", JOptionPane.YES_NO_OPTION);
         if (choix != JOptionPane.YES_OPTION) {
             return;

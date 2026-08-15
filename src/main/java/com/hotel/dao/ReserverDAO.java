@@ -66,19 +66,108 @@ public class ReserverDAO {
     /**
      * Modifie une réservation.
      * Ne touche NI la date de réservation NI le flag {@code annulee}.
+     * <p>
+     * Si la réservation est déjà occupée, le montant stocké dans {@code occuper}
+     * et le solde sont rectifiés du delta entre le nouveau montant
+     * (prix de la nouvelle chambre * nouveaux jours) et l'ancien.
+     *
+     * @throws IllegalArgumentException si la nouvelle chambre n'existe pas
+     *                                  (réservation occupée uniquement)
      */
     public void modifier(Reserver r) throws SQLException {
-        String sql = "UPDATE reserver SET num_chambre = ?, date_entree = ?, "
-                + "nbr_jour = ?, nom_client = ?, mail = ? WHERE id_reserv = ?";
+        try (Connection conn = DBConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // 1) Mettre à jour la réservation.
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE reserver SET num_chambre = ?, date_entree = ?, "
+                        + "nbr_jour = ?, nom_client = ?, mail = ? WHERE id_reserv = ?")) {
+                    ps.setString(1, r.getNumChambre());
+                    ps.setDate(2, Date.valueOf(r.getDateEntree()));
+                    ps.setInt(3, r.getNbrJour());
+                    ps.setString(4, r.getNomClient());
+                    ps.setString(5, r.getMail());
+                    ps.setInt(6, r.getIdReserv());
+                    ps.executeUpdate();
+                }
+
+                // 2) Si la réservation est déjà occupée, rectifier montant + solde.
+                boolean occupee = false;
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT id_occup FROM occuper WHERE id_reserv = ?")) {
+                    ps.setInt(1, r.getIdReserv());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        occupee = rs.next();
+                    }
+                }
+
+                if (occupee) {
+                    // a) Nouveau montant : prix de la nouvelle chambre * nouveaux jours.
+                    int prixNuitee;
+                    try (PreparedStatement ps = conn.prepareStatement(
+                            "SELECT prix_nuitee FROM chambre WHERE num_chambre = ?")) {
+                        ps.setString(1, r.getNumChambre());
+                        try (ResultSet rs = ps.executeQuery()) {
+                            if (!rs.next()) {
+                                conn.rollback();
+                                throw new IllegalArgumentException(
+                                        "Chambre introuvable : " + r.getNumChambre());
+                            }
+                            prixNuitee = rs.getInt("prix_nuitee");
+                        }
+                    }
+                    int nouveauMontant = prixNuitee * r.getNbrJour();
+
+                    // b) Ancien montant stocké dans occuper.
+                    int ancienMontant = 0;
+                    try (PreparedStatement ps = conn.prepareStatement(
+                            "SELECT montant FROM occuper WHERE id_reserv = ?")) {
+                        ps.setInt(1, r.getIdReserv());
+                        try (ResultSet rs = ps.executeQuery()) {
+                            if (rs.next()) {
+                                ancienMontant = rs.getInt("montant");
+                            }
+                        }
+                    }
+
+                    // c) Mettre à jour le montant stocké de l'occupation.
+                    try (PreparedStatement ps = conn.prepareStatement(
+                            "UPDATE occuper SET montant = ? WHERE id_reserv = ?")) {
+                        ps.setInt(1, nouveauMontant);
+                        ps.setInt(2, r.getIdReserv());
+                        ps.executeUpdate();
+                    }
+
+                    // d) Rectifier le solde du delta.
+                    int delta = nouveauMontant - ancienMontant;
+                    if (delta != 0) {
+                        new SoldeDAO().ajouterAuSolde(conn, delta);
+                    }
+                }
+
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        }
+    }
+
+    /**
+     * Indique si la réservation est déjà occupée (une ligne existe dans
+     * {@code occuper}). Utile pour l'UI avant de modifier une réservation.
+     */
+    public boolean isOccupee(int idReserv) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM occuper WHERE id_reserv = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, r.getNumChambre());
-            ps.setDate(2, Date.valueOf(r.getDateEntree()));
-            ps.setInt(3, r.getNbrJour());
-            ps.setString(4, r.getNomClient());
-            ps.setString(5, r.getMail());
-            ps.setInt(6, r.getIdReserv());
-            ps.executeUpdate();
+            ps.setInt(1, idReserv);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getInt(1) > 0;
+            }
         }
     }
 

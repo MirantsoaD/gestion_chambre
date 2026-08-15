@@ -37,19 +37,7 @@ public class SejournerDAO {
         try (Connection conn = DBConnection.getConnection()) {
             conn.setAutoCommit(false);
             try {
-                // 2) Insérer le séjour.
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "INSERT INTO sejourner (num_chambre, date_entree_sejour, nbr_jour, "
-                        + "nom_client, telephone) VALUES (?,?,?,?,?)")) {
-                    ps.setString(1, s.getNumChambre());
-                    ps.setDate(2, Date.valueOf(s.getDateEntreeSejour()));
-                    ps.setInt(3, s.getNbrJour());
-                    ps.setString(4, s.getNomClient());
-                    ps.setString(5, s.getTelephone());
-                    ps.executeUpdate();
-                }
-
-                // 3) Calculer le montant : prix de la nuitée * nombre de jours.
+                // 2) Calculer le montant : prix de la nuitée * nombre de jours.
                 int prixNuitee;
                 try (PreparedStatement ps = conn.prepareStatement(
                         "SELECT prix_nuitee FROM chambre WHERE num_chambre = ?")) {
@@ -64,6 +52,20 @@ public class SejournerDAO {
                     }
                 }
                 int montant = prixNuitee * s.getNbrJour();
+                s.setMontant(montant);
+
+                // 3) Insérer le séjour (montant stocké pour les remboursements futurs).
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "INSERT INTO sejourner (num_chambre, date_entree_sejour, nbr_jour, "
+                        + "nom_client, telephone, montant) VALUES (?,?,?,?,?,?)")) {
+                    ps.setString(1, s.getNumChambre());
+                    ps.setDate(2, Date.valueOf(s.getDateEntreeSejour()));
+                    ps.setInt(3, s.getNbrJour());
+                    ps.setString(4, s.getNomClient());
+                    ps.setString(5, s.getTelephone());
+                    ps.setInt(6, montant);
+                    ps.executeUpdate();
+                }
 
                 // 4) Créditer le solde (même connexion => transaction).
                 new SoldeDAO().ajouterAuSolde(conn, montant);
@@ -96,28 +98,120 @@ public class SejournerDAO {
     /**
      * Modifie un séjour.
      * Ne touche PAS la date d'entrée.
+     * Le solde est rectifié du delta entre le nouveau montant (chambre * jours)
+     * et le montant stocké.
+     *
+     * @throws IllegalArgumentException si le séjour ou la chambre n'existe pas
      */
     public void modifier(Sejourner s) throws SQLException {
-        String sql = "UPDATE sejourner SET num_chambre = ?, nbr_jour = ?, "
-                + "nom_client = ?, telephone = ? WHERE id_sejour = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, s.getNumChambre());
-            ps.setInt(2, s.getNbrJour());
-            ps.setString(3, s.getNomClient());
-            ps.setString(4, s.getTelephone());
-            ps.setInt(5, s.getIdSejour());
-            ps.executeUpdate();
+        try (Connection conn = DBConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // 1) Lire l'ancien montant stocké du séjour.
+                int ancienMontant;
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT montant FROM sejourner WHERE id_sejour = ?")) {
+                    ps.setInt(1, s.getIdSejour());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            conn.rollback();
+                            throw new IllegalArgumentException(
+                                    "Séjour introuvable : " + s.getIdSejour());
+                        }
+                        ancienMontant = rs.getInt("montant");
+                    }
+                }
+
+                // 2) Calculer le nouveau montant avec la chambre choisie dans le formulaire.
+                int prixNuitee;
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT prix_nuitee FROM chambre WHERE num_chambre = ?")) {
+                    ps.setString(1, s.getNumChambre());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            conn.rollback();
+                            throw new IllegalArgumentException(
+                                    "Chambre introuvable : " + s.getNumChambre());
+                        }
+                        prixNuitee = rs.getInt("prix_nuitee");
+                    }
+                }
+                int nouveauMontant = prixNuitee * s.getNbrJour();
+
+                // 3) Mettre à jour le séjour (avec le nouveau montant stocké).
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE sejourner SET num_chambre = ?, nbr_jour = ?, "
+                        + "nom_client = ?, telephone = ?, montant = ? WHERE id_sejour = ?")) {
+                    ps.setString(1, s.getNumChambre());
+                    ps.setInt(2, s.getNbrJour());
+                    ps.setString(3, s.getNomClient());
+                    ps.setString(4, s.getTelephone());
+                    ps.setInt(5, nouveauMontant);
+                    ps.setInt(6, s.getIdSejour());
+                    ps.executeUpdate();
+                }
+
+                // 4) Rectifier le solde du delta (nouveau montant - ancien montant).
+                int delta = nouveauMontant - ancienMontant;
+                if (delta != 0) {
+                    new SoldeDAO().ajouterAuSolde(conn, delta);
+                }
+
+                // 5) Mettre à jour l'objet passé en paramètre.
+                s.setMontant(nouveauMontant);
+
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
         }
     }
 
-    /** Supprime le séjour portant cet identifiant. */
+    /**
+     * Supprime le séjour portant cet identifiant et rembourse le montant stocké
+     * (le solde diminue du montant crédité à l'enregistrement du séjour).
+     *
+     * @throws IllegalArgumentException si le séjour n'existe pas
+     */
     public void supprimer(int idSejour) throws SQLException {
-        String sql = "DELETE FROM sejourner WHERE id_sejour = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idSejour);
-            ps.executeUpdate();
+        try (Connection conn = DBConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // 1) Lire le montant stocké du séjour.
+                int montant;
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT montant FROM sejourner WHERE id_sejour = ?")) {
+                    ps.setInt(1, idSejour);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            conn.rollback();
+                            throw new IllegalArgumentException(
+                                    "Séjour introuvable : " + idSejour);
+                        }
+                        montant = rs.getInt("montant");
+                    }
+                }
+
+                // 2) Supprimer le séjour.
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "DELETE FROM sejourner WHERE id_sejour = ?")) {
+                    ps.setInt(1, idSejour);
+                    ps.executeUpdate();
+                }
+
+                // 3) Rembourser le montant (delta négatif ; 0 pour l'ancien historique).
+                new SoldeDAO().ajouterAuSolde(conn, -montant);
+
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
         }
     }
 
@@ -130,6 +224,7 @@ public class SejournerDAO {
         s.setNbrJour(rs.getInt("nbr_jour"));
         s.setNomClient(rs.getString("nom_client"));
         s.setTelephone(rs.getString("telephone"));
+        s.setMontant(rs.getInt("montant"));
         return s;
     }
 }
