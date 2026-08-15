@@ -2,6 +2,7 @@ package com.hotel.ui;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.io.File;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -9,6 +10,7 @@ import java.util.List;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -21,6 +23,7 @@ import com.hotel.dao.ChambreDAO;
 import com.hotel.dao.SejournerDAO;
 import com.hotel.model.Chambre;
 import com.hotel.model.Sejourner;
+import com.hotel.util.PdfRecuGenerator;
 
 /**
  * Panneau des séjours directs (client sans réservation) : incrémente le solde.
@@ -73,14 +76,17 @@ public class SejournerPanel extends JPanel {
         JButton modButton = new JButton("Modifier");
         JButton delButton = new JButton("Supprimer");
         JButton refreshButton = new JButton("Rafraîchir");
+        JButton pdfButton = new JButton("Reçu PDF");
         addButton.addActionListener(e -> ajouter());
         modButton.addActionListener(e -> modifier());
         delButton.addActionListener(e -> supprimer());
         refreshButton.addActionListener(e -> chargerTable());
+        pdfButton.addActionListener(e -> genererRecu());
         buttons.add(addButton);
         buttons.add(modButton);
         buttons.add(delButton);
         buttons.add(refreshButton);
+        buttons.add(pdfButton);
         add(buttons, BorderLayout.SOUTH);
 
         // Sélection d'une ligne -> remplissage du formulaire
@@ -252,6 +258,39 @@ public class SejournerPanel extends JPanel {
             apresEcriture();
         } catch (SQLException e) {
             afficherErreurBD(e);
+        }
+    }
+
+    /** Génère un reçu PDF pour le séjour sélectionné. */
+    private void genererRecu() {
+        int row = table.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this,
+                    "Sélectionnez un séjour pour générer le reçu.",
+                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        String numero = "SEJ-" + valeur(row, 0);
+        String client = valeur(row, 4);
+        String chambre = valeur(row, 1);
+        String dateEntree = valeur(row, 2);
+        int jours = Integer.parseInt(valeur(row, 3));
+        int montant = Integer.parseInt(valeur(row, 6));
+
+        JFileChooser chooser = new JFileChooser();
+        chooser.setSelectedFile(new File("recu-sejour-" + valeur(row, 0) + ".pdf"));
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        try {
+            File fichier = chooser.getSelectedFile();
+            PdfRecuGenerator.genererRecu(fichier, numero, client, chambre, dateEntree, jours, montant);
+            JOptionPane.showMessageDialog(this, "Reçu généré : " + fichier.getAbsolutePath(),
+                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this,
+                    "Erreur lors de la génération du PDF : " + e.getMessage(),
+                    "Erreur", JOptionPane.ERROR_MESSAGE);
         }
     }
 

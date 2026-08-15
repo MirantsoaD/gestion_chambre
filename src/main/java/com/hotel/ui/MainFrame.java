@@ -28,6 +28,7 @@ public class MainFrame extends JFrame {
     private final ReserverPanel reserverPanel;
     private final OccuperPanel occuperPanel;
     private final SejournerPanel sejournerPanel;
+    private final ChambreLibrePanel chambreLibrePanel;
 
     public MainFrame() {
         super("Gestion des Réservations d'Hôtel");
@@ -51,11 +52,13 @@ public class MainFrame extends JFrame {
         reserverPanel = new ReserverPanel(this);
         occuperPanel = new OccuperPanel(this);
         sejournerPanel = new SejournerPanel(this);
+        chambreLibrePanel = new ChambreLibrePanel(this);
 
         tabbedPane.addTab("Chambres", chambrePanel);
         tabbedPane.addTab("Réservations", reserverPanel);
         tabbedPane.addTab("Occupations", occuperPanel);
         tabbedPane.addTab("Séjours", sejournerPanel);
+        tabbedPane.addTab("Chambres libres", chambreLibrePanel);
         add(tabbedPane, BorderLayout.CENTER);
 
         tabbedPane.addChangeListener(e -> {

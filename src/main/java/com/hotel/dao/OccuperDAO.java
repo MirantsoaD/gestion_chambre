@@ -142,4 +142,100 @@ public class OccuperDAO {
             }
         }
     }
+
+    /**
+     * Relie l'occupation {@code idOccup} à la réservation {@code idReserv} et rectifie
+     * le solde du delta entre le nouveau montant (prix * jours de la nouvelle
+     * réservation) et le montant stocké. Transactionnel.
+     *
+     * @throws IllegalArgumentException si l'occupation n'existe pas, si la réservation
+     *                                  cible est introuvable/annulée, ou si elle est déjà occupée
+     */
+    public void modifier(int idOccup, int idReserv) throws SQLException {
+        try (Connection conn = DBConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // 1) Lire le montant stocké de l'occupation.
+                int ancienMontant;
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT montant FROM occuper WHERE id_occup = ?")) {
+                    ps.setInt(1, idOccup);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            conn.rollback();
+                            throw new IllegalArgumentException(
+                                    "Occupation introuvable : " + idOccup);
+                        }
+                        ancienMontant = rs.getInt("montant");
+                    }
+                }
+
+                // 2) Vérifier que la réservation cible existe et n'est pas annulée.
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT id_reserv FROM reserver WHERE id_reserv = ? AND annulee = FALSE")) {
+                    ps.setInt(1, idReserv);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            conn.rollback();
+                            throw new IllegalArgumentException(
+                                    "Réservation introuvable ou annulée : " + idReserv);
+                        }
+                    }
+                }
+
+                // 3) Vérifier que la réservation cible n'est pas déjà occupée.
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT id_occup FROM occuper WHERE id_reserv = ?")) {
+                    ps.setInt(1, idReserv);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            conn.rollback();
+                            throw new IllegalArgumentException(
+                                    "Cette réservation est déjà occupée : " + idReserv);
+                        }
+                    }
+                }
+
+                // 4) Calculer le nouveau montant : prix de la nuitée * nombre de jours.
+                int nouveauMontant;
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT c.prix_nuitee * r.nbr_jour AS montant "
+                        + "FROM reserver r JOIN chambre c ON c.num_chambre = r.num_chambre "
+                        + "WHERE r.id_reserv = ?")) {
+                    ps.setInt(1, idReserv);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            conn.rollback();
+                            throw new IllegalArgumentException(
+                                    "Réservation introuvable : " + idReserv);
+                        }
+                        nouveauMontant = rs.getInt("montant");
+                    }
+                }
+
+                // 5) Relier l'occupation à la nouvelle réservation.
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE occuper SET id_reserv = ?, montant = ? WHERE id_occup = ?")) {
+                    ps.setInt(1, idReserv);
+                    ps.setInt(2, nouveauMontant);
+                    ps.setInt(3, idOccup);
+                    ps.executeUpdate();
+                }
+
+                // 6) Rectifier le solde du delta.
+                int delta = nouveauMontant - ancienMontant;
+                if (delta != 0) {
+                    new SoldeDAO().ajouterAuSolde(conn, delta);
+                }
+
+                // 7) Valider la transaction.
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        }
+    }
 }

@@ -4,9 +4,11 @@ import com.hotel.model.Chambre;
 import com.hotel.util.DBConnection;
 
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -81,6 +83,43 @@ public class ChambreDAO {
             }
         }
         return null;
+    }
+
+    /**
+     * Liste les chambres libres sur la période [dateEntree ; dateEntree + nbrJour[ :
+     * aucune réservation active (non annulée) ni séjour ne chevauche la période.
+     */
+    public List<Chambre> listerChambresLibres(LocalDate dateEntree, int nbrJour) throws SQLException {
+        List<Chambre> liste = new ArrayList<>();
+        String sql = "SELECT c.* FROM chambre c "
+                + "WHERE NOT EXISTS ( "
+                + "SELECT 1 FROM reserver r "
+                + "WHERE r.num_chambre = c.num_chambre "
+                + "AND r.annulee = FALSE "
+                + "AND r.date_entree < ? "
+                + "AND (r.date_entree + (r.nbr_jour * INTERVAL '1 day')) > ? "
+                + ") "
+                + "AND NOT EXISTS ( "
+                + "SELECT 1 FROM sejourner s "
+                + "WHERE s.num_chambre = c.num_chambre "
+                + "AND s.date_entree_sejour < ? "
+                + "AND (s.date_entree_sejour + (s.nbr_jour * INTERVAL '1 day')) > ? "
+                + ") "
+                + "ORDER BY c.num_chambre";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            // Fin puis début de la période, deux fois (une par NOT EXISTS).
+            ps.setDate(1, Date.valueOf(dateEntree.plusDays(nbrJour)));
+            ps.setDate(2, Date.valueOf(dateEntree));
+            ps.setDate(3, Date.valueOf(dateEntree.plusDays(nbrJour)));
+            ps.setDate(4, Date.valueOf(dateEntree));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    liste.add(mapper(rs));
+                }
+            }
+        }
+        return liste;
     }
 
     /** Convertit la ligne courante du ResultSet en objet Chambre. */

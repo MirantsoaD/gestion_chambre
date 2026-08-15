@@ -2,6 +2,7 @@ package com.hotel.ui;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.io.File;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -10,6 +11,7 @@ import java.util.List;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -21,6 +23,7 @@ import com.hotel.dao.OccuperDAO;
 import com.hotel.dao.ReserverDAO;
 import com.hotel.model.Occuper;
 import com.hotel.model.Reserver;
+import com.hotel.util.PdfRecuGenerator;
 
 /**
  * Panneau des occupations : arrivée d'un client ayant réservé (incrémente le solde).
@@ -65,11 +68,17 @@ public class OccuperPanel extends JPanel {
         // SOUTH : boutons
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.CENTER));
         JButton delButton = new JButton("Supprimer");
+        JButton modButton = new JButton("Modifier");
         JButton refreshButton = new JButton("Rafraîchir");
+        JButton pdfButton = new JButton("Reçu PDF");
         delButton.addActionListener(e -> supprimer());
+        modButton.addActionListener(e -> modifier());
         refreshButton.addActionListener(e -> chargerTable());
+        pdfButton.addActionListener(e -> genererRecu());
         buttons.add(delButton);
+        buttons.add(modButton);
         buttons.add(refreshButton);
+        buttons.add(pdfButton);
         add(buttons, BorderLayout.SOUTH);
 
         chargerTable();
@@ -165,6 +174,78 @@ public class OccuperPanel extends JPanel {
             apresEcriture();
         } catch (SQLException e) {
             afficherErreurBD(e);
+        }
+    }
+
+    /** Rattache l'occupation sélectionnée à une autre réservation (ajuste le solde). */
+    private void modifier() {
+        int row = table.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, "Sélectionnez une occupation à modifier.",
+                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        int idOccup = Integer.parseInt(String.valueOf(tableModel.getValueAt(row, 0)));
+        int index = comboReservations.getSelectedIndex();
+        if (index < 0 || listComboReservations.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "Aucune réservation disponible pour le transfert.",
+                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        Reserver cible = listComboReservations.get(index);
+        int choix = JOptionPane.showConfirmDialog(this,
+                "Rattacher l'occupation à la réservation #" + cible.getIdReserv()
+                        + " ?\nLe solde sera ajusté.",
+                "Confirmation", JOptionPane.YES_NO_OPTION);
+        if (choix != JOptionPane.YES_OPTION) {
+            return;
+        }
+        try {
+            occuperDAO.modifier(idOccup, cible.getIdReserv());
+            JOptionPane.showMessageDialog(this,
+                    "Occupation modifiée. Le solde a été ajusté.",
+                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+            apresEcriture();
+        } catch (SQLException e) {
+            afficherErreurBD(e);
+        } catch (IllegalArgumentException e) {
+            JOptionPane.showMessageDialog(this, e.getMessage(),
+                    "Erreur", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /** Génère un reçu PDF pour l'occupation sélectionnée. */
+    private void genererRecu() {
+        int row = table.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this,
+                    "Sélectionnez une occupation pour générer le reçu.",
+                    "Erreur", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        String numero = "OCC-" + String.valueOf(tableModel.getValueAt(row, 0));
+        String client = String.valueOf(tableModel.getValueAt(row, 3));
+        String chambre = String.valueOf(tableModel.getValueAt(row, 2));
+        String dateEntree = String.valueOf(tableModel.getValueAt(row, 4));
+        int jours = Integer.parseInt(String.valueOf(tableModel.getValueAt(row, 5)));
+        int montant = Integer.parseInt(String.valueOf(tableModel.getValueAt(row, 6)));
+
+        JFileChooser chooser = new JFileChooser();
+        chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        chooser.setSelectedFile(new File("recu-" + tableModel.getValueAt(row, 0) + ".pdf"));
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        try {
+            File fichier = chooser.getSelectedFile();
+            PdfRecuGenerator.genererRecu(fichier, numero, client, chambre, dateEntree, jours, montant);
+            JOptionPane.showMessageDialog(this, "Reçu généré : " + fichier.getAbsolutePath(),
+                    "Succès", JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this,
+                    "Erreur lors de la génération du PDF : " + e.getMessage(),
+                    "Erreur", JOptionPane.ERROR_MESSAGE);
         }
     }
 
